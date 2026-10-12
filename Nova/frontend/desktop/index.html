@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Nova — On-Device Tutor</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+  <!-- Toast notifications -->
+  <div id="toast-container"></div>
+
+  <div id="app">
+
+    <!-- Sidebar -->
+    <aside id="sidebar">
+      <div class="sidebar-header">
+        <h1 class="logo">Nova</h1>
+        <span class="badge" id="engine-badge">local</span>
+      </div>
+
+      <nav>
+        <button class="nav-btn active" data-view="chat" onclick="switchView('chat')">
+          <span class="nav-icon">💬</span> Chat
+        </button>
+        <button class="nav-btn" data-view="documents" onclick="switchView('documents')">
+          <span class="nav-icon">📄</span> Documents
+        </button>
+        <button class="nav-btn" data-view="quizzes" onclick="switchView('quizzes')">
+          <span class="nav-icon">📝</span> Quizzes
+        </button>
+        <button class="nav-btn" data-view="settings" onclick="switchView('settings')">
+          <span class="nav-icon">⚙️</span> Settings
+        </button>
+      </nav>
+
+      <div class="sidebar-footer" id="sidebar-status">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-text">Ready</span>
+      </div>
+    </aside>
+
+    <!-- Network status bar (shown when offline) -->
+    <div id="network-status" hidden>
+      <span>⚠️</span>
+      <span>Network connection lost — some features may be unavailable</span>
+    </div>
+
+    <!-- Main -->
+    <main id="main"> <!-- ─── CHAT VIEW ─── -->
+      <div id="view-chat" class="view active">
+        <div class="view-header">
+          <h2>Chat</h2>
+          <div class="header-actions">
+            <div class="model-badge" id="chat-model-badge" onclick="openModelSwitchFromChat()"
+              title="Click to switch model">
+              <span id="chat-model-name">loading…</span>
+            </div>
+            <select id="session-select" onchange="switchSession(this.value)">
+              <option value="">+ New session</option>
+            </select>
+            <button class="btn-sm" onclick="newSession()" title="New session">✚</button>
+            <button class="btn-sm btn-danger-outline" id="btn-delete-session" onclick="deleteSession()"
+              title="Delete current session" hidden>🗑</button>
+          </div>
+        </div>
+
+        <div id="messages" class="scroll-area">
+          <div class="welcome">
+            <div class="welcome-icon">📚</div>
+            <h3>Welcome to Nova</h3>
+            <p>Upload a PDF document and start asking questions.<br>Or just chat — Nova will help you learn.</p>
+            <button class="btn-primary" onclick="switchView('documents')">Upload a Document</button>
+          </div>
+        </div>
+
+        <div class="input-area">
+          <div id="doc-indicator" class="doc-indicator" hidden>
+            <span>Using: <strong id="doc-name"></strong></span>
+            <button class="btn-link" onclick="clearDoc()">✕</button>
+          </div>
+          <div class="input-row">
+            <textarea id="chat-input" rows="1" placeholder="Ask a question about your document..."
+              oninput="onChatInput(this)"></textarea>
+            <button id="send-btn" onclick="send()" disabled title="Send (Enter)">
+              <span class="kbd-hint">Enter</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── DOCUMENTS VIEW ─── -->
+      <div id="view-documents" class="view">
+        <div class="view-header">
+          <h2>Documents</h2>
+          <button class="btn-sm" onclick="document.getElementById('file-input').click()">+ Upload</button>
+        </div>
+
+        <div class="scroll-area">
+          <div id="drop-zone" class="drop-zone">
+            <div class="drop-content">
+              <span class="drop-icon">📄</span>
+              <p>Drop a PDF here or click to browse</p>
+              <button class="btn-primary" onclick="document.getElementById('file-input').click()">Choose PDF</button>
+            </div>
+            <input type="file" id="file-input" accept=".pdf" hidden onchange="uploadFile(this.files[0])">
+          </div>
+
+          <div id="documents-list">
+            <!-- Documents rendered here by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── QUIZZES VIEW ─── -->
+      <div id="view-quizzes" class="view">      <div class="view-header">
+        <h2>Quizzes</h2>
+        <div class="header-actions">
+          <select id="quiz-chunk-select" class="chunk-select" onchange="onQuizChunkChange(this.value)"
+                  title="Section used for quiz generation">
+            <option value="">No document selected</option>
+          </select>
+          <button class="btn-sm" id="btn-gen-quiz" onclick="generateQuiz()" title="Generate a quiz from the selected section">
+            ✨ Generate
+          </button>
+        </div>
+      </div>
+
+        <div class="scroll-area" id="quiz-scroll">
+          <div id="quiz-content">
+            <div class="empty-state">
+              <div class="empty-icon">📝</div>
+              <h3>No quizzes yet</h3>
+              <p>Select a document and click <strong>Generate</strong> to create a quiz, or ask Nova to make one in
+                chat.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── SETTINGS VIEW ─── -->
+      <div id="view-settings" class="view">
+        <div class="view-header">
+          <h2>Settings</h2>
+        </div>
+
+        <div class="scroll-area">
+          <div class="settings-form">
+            <div class="setting-group">
+              <label for="engine-select">Engine</label>
+              <select id="engine-select" onchange="saveSetting('engine', this.value)">
+                <option value="local">Local (llama.cpp)</option>
+                <option value="online">Online (OpenAI)</option>
+              </select>
+            </div>
+
+            <div class="setting-group" id="openai-key-group" style="display:none">
+              <label for="openai-key-input">OpenAI API Key</label>
+              <input type="password" id="openai-key-input" placeholder="sk-..." autocomplete="off"
+                onchange="saveSetting('openai_api_key', this.value)">
+              <span class="setting-hint">Used when Engine is set to Online (OpenAI)</span>
+            </div>
+
+            <div class="setting-group">
+              <label for="temp-range">Temperature: <span id="temp-val">0.7</span></label>
+              <input type="range" id="temp-range" min="0" max="2" step="0.1" value="0.7"
+                oninput="document.getElementById('temp-val').textContent=this.value; saveSettingDelayed('temperature', this.value)">
+            </div>
+
+            <div class="setting-group">
+              <label for="ctx-size">Context Size</label>
+              <select id="ctx-size" onchange="saveSetting('context_size', this.value)">
+                <option value="1024">1,024</option>
+                <option value="2048" selected>2,048</option>
+                <option value="4096">4,096</option>
+                <option value="8192">8,192</option>
+              </select>
+            </div>
+
+            <div class="setting-group">
+              <label for="model-select">Local Model</label>
+              <select id="model-select" onchange="onModelSelectChange(this.value)">
+                <option value="gemma-3-1b">Gemma 3 1B IT — Best quality (~20s)</option>
+                <option value="gemma-3-270m">Gemma 3 270M IT — Faster (~5s)</option>
+              </select>
+              <span id="model-install-status" class="setting-hint"></span>
+            </div>
+
+          <div class="setting-group model-install-group">
+            <label>Model Status</label>
+            <div class="model-install-row">
+              <button class="btn-sm" id="model-download-btn" onclick="downloadModel()">Install model</button>
+              <span id="model-download-status" class="setting-hint">Checking model...</span>
+            </div>
+          </div>
+
+          <div class="setting-group model-install-group">
+            <label>Semantic Search</label>
+            <div class="model-install-row">
+              <button class="btn-sm" id="embed-download-btn" onclick="downloadEmbeddingModel()">Install embeddings</button>
+              <span id="embed-status" class="setting-hint">Checking…</span>
+            </div>
+            <span class="setting-hint">
+              Adds local semantic retrieval (all-MiniLM-L6-v2). Without it Nova
+              falls back to keyword search only.
+            </span>
+          </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Loading overlay -->
+  <div id="loading" class="loading-overlay" hidden>
+    <div class="spinner"></div>
+    <span id="loading-text">Processing...</span>
+  </div>
+
+  <!-- Confirm dialog modal -->
+  <div id="confirm-modal" class="modal-overlay" hidden>
+    <div class="modal-box">
+      <h3 id="confirm-title">Confirm</h3>
+      <p id="confirm-message">Are you sure?</p>
+      <div class="modal-actions">
+        <button class="btn-sm" onclick="closeConfirm()">Cancel</button>
+        <button class="btn-sm btn-danger" id="confirm-yes" onclick="confirmAction()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Document Summary Modal -->
+  <div id="summary-modal" class="modal-overlay" hidden>
+    <div class="modal-box summary-modal-box">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 id="summary-title" style="margin:0">Document Summary</h3>
+        <button class="btn-sm" onclick="closeSummaryModal()">✕</button>
+      </div>
+      <div id="summary-content" class="summary-text"
+        style="max-height:400px;overflow-y:auto;line-height:1.6;font-size:13px;padding:8px 4px;white-space:pre-wrap">
+        Loading summary...
+      </div>
+      <div class="modal-actions" style="margin-top:16px">
+        <button class="btn-sm btn-primary" onclick="closeSummaryModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Model switch confirmation modal -->
+  <div id="model-switch-modal" class="modal-overlay" hidden>
+    <div class="modal-box">
+      <h3 id="model-switch-title">Switch Model?</h3>
+      <p id="model-switch-message">Changing the model will affect your current conversation. The model needs to reload,
+        which may take a moment. Are you sure you want to switch?</p>
+      <div class="modal-actions">
+        <button class="btn-sm" onclick="closeModelSwitch()">Cancel</button>
+        <button class="btn-sm btn-primary" id="model-switch-confirm" onclick="confirmModelSwitch()">Switch
+          Model</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Startup model selection modal -->
+  <div id="startup-model-modal" class="modal-overlay">
+    <div class="modal-box startup-modal">
+      <h3>Welcome to Nova</h3>
+      <p>Select a local model to get started. You can change this anytime in Settings.</p>
+      <div class="model-cards" id="startup-model-cards">
+        <div class="model-card selected" data-model="gemma-3-1b" onclick="selectStartupModel('gemma-3-1b')">
+          <div class="model-card-icon">🧠</div>
+          <div class="model-card-name">Gemma 3 1B IT</div>
+          <div class="model-card-desc">Best quality, ~20s response</div>
+          <div class="model-card-check">✓</div>
+        </div>
+        <div class="model-card" data-model="gemma-3-270m" onclick="selectStartupModel('gemma-3-270m')">
+          <div class="model-card-icon">⚡</div>
+          <div class="model-card-name">Gemma 3 270M IT</div>
+          <div class="model-card-desc">Faster, lightweight, ~5s response</div>
+          <div class="model-card-check"></div>
+        </div>
+      </div>
+      <div class="modal-actions" style="justify-content: space-between;">
+        <button class="btn-sm" onclick="skipStartupModel()">Skip — use default</button>
+        <button class="btn-primary" id="startup-model-btn" onclick="confirmStartupModel()">Start with Gemma 3
+          1B</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=3"></script>
+</body>
+
+</html>

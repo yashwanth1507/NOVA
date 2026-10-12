@@ -1,0 +1,26 @@
+# Nova Desktop — Python Dependencies
+
+# Web framework
+fastapi>=0.139.0
+uvicorn>=0.24.0
+pydantic>=2.0.0
+python-multipart>=0.0.12
+
+# Model inference
+llama-cpp-python>=0.2.0
+openai>=1.0.0
+
+# Document processing
+pypdf>=4.0.0
+pdfplumber>=0.10.0
+
+# Embeddings (desktop only)
+sentence-transformers>=2.2.0
+# Vectorized cosine scoring for hybrid retrieval (pure-Python fallback exists)
+numpy>=1.24.0
+
+# Desktop UI
+pywebview>=5.0.0
+
+# Testing
+pytest>=8.0.0
